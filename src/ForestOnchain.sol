@@ -8,9 +8,11 @@ import {AutomationCompatibleInterface} from "@chainlink/contracts/src/v0.8/autom
 
 contract ForestOnchain {
     error ForestOnchain__AddAnActivityType();
-    error ForestOnchain_AnotherSessionOngoing(string currentSession);
-    error ForestOnchain_NoOngoingSession(address user);
-    error ForestOnchain_BreakNeeded();
+    error ForestOnchain__AnotherSessionOngoing(string currentSession);
+    error ForestOnchain__NoOngoingSession(address user);
+    error ForestOnchain__BreakNeeded();
+    error ForestOnchain__SessionOngoing(address user);
+    error ForestOnchain__BreakNotNeeded(address user);
 
     mapping(address => string[]) public userActivityTypes;
     mapping(address => UserSession) public currentUserSession;
@@ -23,9 +25,11 @@ contract ForestOnchain {
     event SessionStarted(
         address indexed user,
         string indexed activityType,
-        uint256 startTime,
+        uint256 indexed startTime,
         uint256 endTime
     );
+    event BreakTaken(address indexed user);
+    event SessionEnded(address indexed user);
 
     struct UserSession {
         string activityType;
@@ -49,12 +53,12 @@ contract ForestOnchain {
         }
         bool sessionActive = currentUserSession[msg.sender].active;
         if (sessionActive) {
-            revert ForestOnchain_AnotherSessionOngoing(
+            revert ForestOnchain__AnotherSessionOngoing(
                 currentUserSession[msg.sender].activityType
             );
         }
         if (breakNeeded[msg.sender]) {
-            revert ForestOnchain_BreakNeeded();
+            revert ForestOnchain__BreakNeeded();
         }
         currentUserSession[msg.sender] = UserSession({
             activityType: _activityType,
@@ -95,14 +99,30 @@ contract ForestOnchain {
     function endFocusSession(address _user) public {
         bool sessionActive = currentUserSession[_user].active;
         if (!sessionActive) {
-            revert ForestOnchain_NoOngoingSession(_user);
+            revert ForestOnchain__NoOngoingSession(_user);
         }
-        if (currentUserSession[_user].endTime > block.timestamp) {
+        if (currentUserSession[_user].endTime >= block.timestamp) {
             delete currentUserSession[_user];
+            emit SessionEnded(msg.sender);
         } else {
             numberOfTrees[_user] += 1;
             delete currentUserSession[_user];
             breakNeeded[_user] = true;
         }
+    }
+
+    /**
+     * @dev Function called by a user.
+     */
+    function takeBreak() public {
+        bool sessionActive = currentUserSession[msg.sender].active;
+        if (sessionActive) {
+            revert ForestOnchain__SessionOngoing(msg.sender);
+        }
+        if (!breakNeeded[msg.sender]) {
+            revert ForestOnchain__BreakNotNeeded(msg.sender);
+        }
+        breakNeeded[msg.sender] = false;
+        emit BreakTaken(msg.sender);
     }
 }
