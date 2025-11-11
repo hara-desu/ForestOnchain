@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 // TODO:
-// 1. Change vars to internal and create getter functions
-// 2. Add tree types
+// 1. Add tree types
 pragma solidity ^0.8.13;
 
 import {AutomationCompatibleInterface} from "@chainlink/contracts/src/v0.8/automation/AutomationCompatible.sol";
@@ -14,12 +13,11 @@ contract ForestOnchain {
     error ForestOnchain__SessionOngoing(address user);
     error ForestOnchain__BreakNotNeeded(address user);
 
-    mapping(address => string[]) public userActivityTypes;
-    mapping(address => UserSession) public currentUserSession;
-    mapping(address => uint256) public numberOfTrees;
-    mapping(address => bool) public breakNeeded;
-    address[] public users;
-    mapping(address => uint256) public activeUserIdx;
+    mapping(address => string[]) internal userActivityTypes;
+    mapping(address => UserSession) internal currentUserSession;
+    mapping(address => uint256) internal numberOfTrees;
+    mapping(address => bool) internal breakNeeded;
+    address[] internal users;
 
     event ActivityAdded(string indexed activityType);
     event SessionStarted(
@@ -124,5 +122,30 @@ contract ForestOnchain {
         }
         breakNeeded[msg.sender] = false;
         emit BreakTaken(msg.sender);
+    }
+
+    /* Getter Functions */
+    function getUserActivityTypes(
+        address _user
+    ) external returns (string[] memory) {
+        return userActivityTypes[_user];
+    }
+
+    function getCurrentUserSession(
+        address _user
+    ) external returns (UserSession memory) {
+        return currentUserSession[_user];
+    }
+
+    function getNumberOfTrees(address _user) external returns (uint256) {
+        return numberOfTrees[_user];
+    }
+
+    function getBreakNeeded(address _user) external returns (bool) {
+        return breakNeeded[_user];
+    }
+
+    function getUsers() external returns (address[] memory) {
+        return users;
     }
 }
