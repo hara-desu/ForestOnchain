@@ -9,6 +9,7 @@ contract ForestOnchainTest is Test {
     uint public CONTRACT_FUND_AMOUNT = 1e17;
     uint public USER_FUND_AMOUNT = 5 ether;
     address USER1 = makeAddr("USER1");
+    address USER2 = makeAddr("USER2");
     uint public constant COST_PER_TREE = 1e9;
     string constant ACTIVITY_TYPE_1 = "Study";
     string constant ACTIVITY_TYPE_2 = "Work";
@@ -247,4 +248,36 @@ contract ForestOnchainTest is Test {
         // Assert
         assert(upkeepNeeded);
     }
+
+    //////////////////////////////////
+    /* ForestOnchain: performUpkeep */
+    //////////////////////////////////
+    function testPerformUpkeepWorks() public {
+        // Arrange
+        uint stakeAmount = forestOnchain.getStakeAmount(GOAL_TREES);
+        vm.prank(USER1);
+        forestOnchain.startGoal{value: stakeAmount}(
+            ACTIVITY_TYPE_1,
+            GOAL_DURATION,
+            GOAL_TREES
+        );
+
+        // Act
+        vm.prank(USER1);
+        forestOnchain.startFocusSession(ACTIVITY_TYPE_1, SESSION_DURATION);
+        vm.warp(block.timestamp + SESSION_DURATION);
+        (bool upkeepNeeded, bytes memory performData) = forestOnchain
+            .checkUpkeep("");
+
+        vm.expectEmit(address(forestOnchain));
+        emit ForestOnchain.SessionEnded(USER1);
+
+        forestOnchain.performUpkeep(performData);
+        // Assert
+    }
+
+    ////////////////////////////////////
+    /* ForestOnchain: endFocusSession */
+    ////////////////////////////////////
+    function testEndFocusSessionRevertsIfUserIsNotSessionOwner() public {}
 }

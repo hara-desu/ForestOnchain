@@ -23,7 +23,7 @@ contract ForestOnchain {
     error ForestOnchain__TransferFailed();
     error ForestOnchain__InsufficientFunds();
     error ForestOnchain__CannotSendToZeroAddress();
-    error ForestOnchain__SessionsCanBeEndedOnlyByOwners(address owner);
+    error ForestOnchain__SessionNotEndedYet(uint sessionEndTime);
 
     mapping(address => string[]) internal userActivityTypes;
     mapping(address => UserSession) internal currentUserSession;
@@ -181,25 +181,23 @@ contract ForestOnchain {
     }
 
     function endFocusSession(address _user) public {
-        address sessionOwner = currentUserSession[_user].owner;
-        if (sessionOwner != _user) {
-            revert ForestOnchain__SessionsCanBeEndedOnlyByOwners(sessionOwner);
-        }
         bool sessionActive = currentUserSession[_user].active;
         string memory sessionActivityType = currentUserSession[_user]
             .activityType;
         if (!sessionActive) {
             revert ForestOnchain__NoOngoingSession(_user);
         }
-        if (currentUserSession[_user].endTime >= block.timestamp) {
-            delete currentUserSession[_user];
-            emit SessionEnded(msg.sender);
+        if (currentUserSession[_user].endTime > block.timestamp) {
+            revert ForestOnchain__SessionNotEndedYet(
+                currentUserSession[_user].endTime
+            );
         } else {
             numberOfTrees[_user][sessionActivityType] += 1;
-            UserGoal storage goal = userGoals[msg.sender][sessionActivityType];
+            UserGoal storage goal = userGoals[_user][sessionActivityType];
             goal.numberOfTrees -= 1;
             delete currentUserSession[_user];
             breakNeeded[_user] = true;
+            emit SessionEnded(_user);
         }
     }
 
