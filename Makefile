@@ -1,7 +1,7 @@
 -include .env
 
 deploy-anvil:
-	forge script script/DeployLowkickStarter.s.sol:DeployLowkickStarter \
+	forge script script/DeployForestOnchain.s.sol:DeployForestOnchainLocal \
 		--rpc-url $(ANVIL_RPC_URL) \
 		--broadcast \
 		--private-key $(ANVIL_PRIVATE_KEY) \
@@ -11,6 +11,8 @@ test-specific:
 	forge test --mt $(TEST) -vvvv
 
 deploy-sepolia:
-	forge script script/DeployLowkickStarter.s.sol:DeployLowkickStarterSepolia \
+	forge script script/DeployForestOnchain.s.sol:DeployForestOnchainSepolia \
 		--rpc-url $(SEPOLIA_RPC_URL) \
-		--broadcast 
+		--broadcast \
+		--verify \
+    	--etherscan-api-key $(ETHERSCAN_API_KEY)

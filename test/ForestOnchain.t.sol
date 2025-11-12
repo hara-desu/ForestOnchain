@@ -8,9 +8,10 @@ contract ForestOnchainTest is Test {
     ForestOnchain public forestOnchain;
     uint public CONTRACT_FUND_AMOUNT = 1e17;
     address USER1 = makeAddr("USER1");
+    uint public constant COST_PER_TREE = 1e9;
 
     function setUp() public {
-        forestOnchain = new ForestOnchain();
+        forestOnchain = new ForestOnchain(COST_PER_TREE);
         vm.deal(address(forestOnchain), CONTRACT_FUND_AMOUNT);
     }
 

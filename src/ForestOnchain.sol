@@ -237,7 +237,7 @@ contract ForestOnchain {
             if (msg.value != stakeAmount) {
                 revert ForestOnchain__IncorrectStakeSent(
                     msg.value,
-                    requiredStake
+                    stakeAmount
                 );
             }
             userGoals[msg.sender][_activityType].activityType = _activityType;
@@ -309,9 +309,7 @@ contract ForestOnchain {
         return users;
     }
 
-    function getStakeAmount(
-        uint _numOfTrees
-    ) public returns (address[] memory) {
+    function getStakeAmount(uint _numOfTrees) public returns (uint) {
         return _numOfTrees * cost_per_tree;
     }
 }
