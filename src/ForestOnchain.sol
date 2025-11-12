@@ -1,7 +1,4 @@
 // SPDX-License-Identifier: MIT
-// TODO:
-// 1. Add goals and staking
-// 2. Add removal of activity types
 pragma solidity ^0.8.13;
 
 import {AutomationCompatibleInterface} from "@chainlink/contracts/src/v0.8/automation/AutomationCompatible.sol";
@@ -21,6 +18,9 @@ contract ForestOnchain {
     error ForestOnchain__NoActiveGoal(string activityType);
     error ForestOnchain__GoalNotReached(uint numberOfTrees);
     error ForestOnchain__GoalDurationIsOver(uint endTime, uint currentTime);
+    error ForestOnchain__TransferFailed();
+    error ForestOnchain__InsufficientFunds();
+    error ForestOnchain__CannotSendToZeroAddress();
 
     mapping(address => string[]) internal userActivityTypes;
     mapping(address => UserSession) internal currentUserSession;
@@ -57,6 +57,8 @@ contract ForestOnchain {
         string indexed activityType,
         uint stakeAmount
     );
+
+    event EtherWithdrawn(address indexed to, uint indexed amount);
 
     struct UserSession {
         string activityType;
@@ -277,8 +279,24 @@ contract ForestOnchain {
         uint stakeAmount = goal.stakeAmount;
         delete userGoals[msg.sender][_activityType];
         (bool success, ) = payable(msg.sender).call{value: stakeAmount}("");
-        require(success, "ForestOnchain__TransferFailed");
+        if (!success) {
+            revert ForestOnchain__TransferFailed();
+        }
         emit GoalClaimed(msg.sender, _activityType, stakeAmount);
+    }
+
+    function withdraw(address payable _to, uint256 _amount) external onlyOwner {
+        if (_to != address(0)) {
+            revert ForestOnchain__CannotSendToZeroAddress();
+        }
+        if (_amount <= address(this).balance) {
+            revert ForestOnchain__InsufficientFunds();
+        }
+        (bool success, ) = _to.call{value: amount}("");
+        if (!success) {
+            revert ForestOnchain__TransferFailed();
+        }
+        emit EtherWithdrawn(_to, _amount);
     }
 
     /* Getter Functions */
