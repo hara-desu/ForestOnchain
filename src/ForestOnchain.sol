@@ -32,7 +32,7 @@ contract ForestOnchain {
     mapping(address => mapping(string => UserGoal)) internal userGoals;
     address[] internal users;
     uint public cost_per_tree;
-    address immutable CONTRACT_OWNER;
+    address public immutable CONTRACT_OWNER;
     uint constant MAX_SESSION_DURATION = 60 minutes;
     uint constant MIN_SESSION_DURATION = 20 minutes;
     uint constant MIN_NUM_TREES_PER_GOAL = 1;
@@ -62,6 +62,7 @@ contract ForestOnchain {
     );
 
     event EtherWithdrawn(address indexed to, uint indexed amount);
+    event CostPerTreeChanged(uint costPerTree);
 
     struct UserSession {
         string activityType;
@@ -218,6 +219,7 @@ contract ForestOnchain {
 
     function changeCostPerTree(uint _costPerTree) external onlyOwner {
         cost_per_tree = _costPerTree;
+        emit CostPerTreeChanged(_costPerTree);
     }
 
     function startGoal(
@@ -225,10 +227,6 @@ contract ForestOnchain {
         uint _duration,
         uint _numOfTrees
     ) public payable {
-        bool activityExists = checkActivityExists(msg.sender, _activityType);
-        if (!activityExists) {
-            addActivityType(_activityType, msg.sender);
-        }
         if (_duration < MAX_SESSION_DURATION) {
             revert ForestOnchain__GoalDurationShouldBeMoreThan60Minutes(
                 _duration
@@ -294,10 +292,10 @@ contract ForestOnchain {
     }
 
     function withdraw(address payable _to, uint256 _amount) external onlyOwner {
-        if (_to != address(0)) {
+        if (_to == payable(address(0))) {
             revert ForestOnchain__CannotSendToZeroAddress();
         }
-        if (_amount <= address(this).balance) {
+        if (_amount > address(this).balance) {
             revert ForestOnchain__InsufficientFunds();
         }
         (bool success, ) = _to.call{value: _amount}("");
@@ -337,5 +335,19 @@ contract ForestOnchain {
 
     function getStakeAmount(uint _numOfTrees) public returns (uint) {
         return _numOfTrees * cost_per_tree;
+    }
+
+    function getGoal(
+        address _user,
+        string calldata _activityType
+    ) public returns (uint) {
+        return userGoals[_user][_activityType].numberOfTrees;
+    }
+
+    function getEndTime(
+        address _user,
+        string calldata _activityType
+    ) public returns (uint) {
+        return userGoals[_user][_activityType].endTime;
     }
 }
