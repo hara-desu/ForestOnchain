@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: MIT
+// TODO:
+// 1. Store hashed values of activiyTypes
 pragma solidity ^0.8.13;
 
 import {AutomationCompatibleInterface} from "@chainlink/contracts/src/v0.8/automation/AutomationCompatible.sol";
@@ -21,6 +23,7 @@ contract ForestOnchain {
     error ForestOnchain__TransferFailed();
     error ForestOnchain__InsufficientFunds();
     error ForestOnchain__CannotSendToZeroAddress();
+    error ForestOnchain__SessionsCanBeEndedOnlyByOwners(address owner);
 
     mapping(address => string[]) internal userActivityTypes;
     mapping(address => UserSession) internal currentUserSession;
@@ -30,9 +33,9 @@ contract ForestOnchain {
     address[] internal users;
     uint public cost_per_tree;
     address immutable CONTRACT_OWNER;
-    uint constant MAX_SESSION_DURATION = 3600;
-    uint constant MIN_SESSION_DURATION = 1200;
-    uint constant MIN_NUM_TREES_PER_GOAL = 2;
+    uint constant MAX_SESSION_DURATION = 60 minutes;
+    uint constant MIN_SESSION_DURATION = 20 minutes;
+    uint constant MIN_NUM_TREES_PER_GOAL = 1;
 
     event ActivityAdded(string indexed activityType);
     event SessionStarted(
@@ -65,6 +68,7 @@ contract ForestOnchain {
         uint256 startTime;
         uint256 endTime;
         bool active;
+        address owner;
     }
 
     struct UserGoal {
@@ -100,7 +104,7 @@ contract ForestOnchain {
     function checkActivityExists(
         address _user,
         string calldata _activityType
-    ) internal returns (bool) {
+    ) public returns (bool) {
         string[] memory userActivities = userActivityTypes[_user];
         bytes32 targetActivityHash = keccak256(bytes(_activityType));
         for (uint i = 0; i < userActivities.length; i++) {
@@ -126,7 +130,7 @@ contract ForestOnchain {
             revert ForestOnchain__BreakNeeded();
         }
         if (
-            _duration < MIN_SESSION_DURATION && _duration > MAX_SESSION_DURATION
+            _duration < MIN_SESSION_DURATION || _duration > MAX_SESSION_DURATION
         ) {
             revert ForestOnchain__DurationOutOfRange(_duration);
         }
@@ -142,8 +146,10 @@ contract ForestOnchain {
             activityType: _activityType,
             startTime: block.timestamp,
             endTime: block.timestamp + _duration,
-            active: true
+            active: true,
+            owner: msg.sender
         });
+        users.push(msg.sender);
         emit SessionStarted(
             msg.sender,
             _activityType,
@@ -175,6 +181,10 @@ contract ForestOnchain {
     }
 
     function endFocusSession(address _user) public {
+        address sessionOwner = currentUserSession[_user].owner;
+        if (sessionOwner != _user) {
+            revert ForestOnchain__SessionsCanBeEndedOnlyByOwners(sessionOwner);
+        }
         bool sessionActive = currentUserSession[_user].active;
         string memory sessionActivityType = currentUserSession[_user]
             .activityType;
@@ -219,7 +229,7 @@ contract ForestOnchain {
     ) public payable {
         bool activityExists = checkActivityExists(msg.sender, _activityType);
         if (!activityExists) {
-            revert ForestOnchain__AddActivityType();
+            addActivityType(_activityType, msg.sender);
         }
         if (_duration < MAX_SESSION_DURATION) {
             revert ForestOnchain__GoalDurationShouldBeMoreThan60Minutes(
@@ -292,7 +302,7 @@ contract ForestOnchain {
         if (_amount <= address(this).balance) {
             revert ForestOnchain__InsufficientFunds();
         }
-        (bool success, ) = _to.call{value: amount}("");
+        (bool success, ) = _to.call{value: _amount}("");
         if (!success) {
             revert ForestOnchain__TransferFailed();
         }
