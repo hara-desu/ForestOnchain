@@ -1,23 +1,38 @@
 // SPDX-License-Identifier: MIT
 // TODO:
-// 1. Add tree types
+// 1. Add goals and staking
+// 2. Add removal of activity types
 pragma solidity ^0.8.13;
 
 import {AutomationCompatibleInterface} from "@chainlink/contracts/src/v0.8/automation/AutomationCompatible.sol";
 
 contract ForestOnchain {
-    error ForestOnchain__AddAnActivityType();
+    error ForestOnchain__AddActivityType();
     error ForestOnchain__AnotherSessionOngoing(string currentSession);
     error ForestOnchain__NoOngoingSession(address user);
     error ForestOnchain__BreakNeeded();
     error ForestOnchain__SessionOngoing(address user);
     error ForestOnchain__BreakNotNeeded(address user);
+    error ForestOnchain__DurationOutOfRange(uint duration);
+    error ForestOnchain__GoalDurationShouldBeMoreThan60Minutes(uint duration);
+    error ForestOnchain__EnterMoreThankMinNumOfTreesPerGoal(uint numberOfTrees);
+    error ForestOnchain__GoalAlreadyExists();
+    error ForestOnchain__IncorrectStakeSent(uint sentValue, uint requiredStake);
+    error ForestOnchain__NoActiveGoal(string activityType);
+    error ForestOnchain__GoalNotReached(uint numberOfTrees);
+    error ForestOnchain__GoalDurationIsOver(uint endTime, uint currentTime);
 
     mapping(address => string[]) internal userActivityTypes;
     mapping(address => UserSession) internal currentUserSession;
-    mapping(address => uint256) internal numberOfTrees;
+    mapping(address => mapping(string => uint256)) internal numberOfTrees;
     mapping(address => bool) internal breakNeeded;
+    mapping(address => mapping(string => UserGoal)) internal userGoals;
     address[] internal users;
+    uint public cost_per_tree;
+    address immutable CONTRACT_OWNER;
+    uint constant MAX_SESSION_DURATION = 3600;
+    uint constant MIN_SESSION_DURATION = 1200;
+    uint constant MIN_NUM_TREES_PER_GOAL = 2;
 
     event ActivityAdded(string indexed activityType);
     event SessionStarted(
@@ -28,6 +43,20 @@ contract ForestOnchain {
     );
     event BreakTaken(address indexed user);
     event SessionEnded(address indexed user);
+    event GoalStarted(
+        address indexed user,
+        string indexed activityType,
+        uint indexed startTime,
+        uint endTime,
+        bool active,
+        uint numOfTrees,
+        uint stakeAmount
+    );
+    event GoalClaimed(
+        address indexed user,
+        string indexed activityType,
+        uint stakeAmount
+    );
 
     struct UserSession {
         string activityType;
@@ -36,19 +65,55 @@ contract ForestOnchain {
         bool active;
     }
 
-    function addActivityType(string calldata _activityType) public {
-        userActivityTypes[msg.sender].push(_activityType);
+    struct UserGoal {
+        string activityType;
+        uint256 startTime;
+        uint256 endTime;
+        bool active;
+        uint numberOfTrees;
+        uint stakeAmount;
+    }
+
+    modifier onlyOwner() {
+        require(
+            msg.sender == CONTRACT_OWNER,
+            "Only owner can call this function"
+        );
+        _;
+    }
+
+    constructor(uint _costPerTree) {
+        cost_per_tree = _costPerTree;
+        CONTRACT_OWNER = msg.sender;
+    }
+
+    function addActivityType(
+        string calldata _activityType,
+        address _user
+    ) internal {
+        userActivityTypes[_user].push(_activityType);
         emit ActivityAdded(_activityType);
     }
 
+    function checkActivityExists(
+        address _user,
+        string calldata _activityType
+    ) internal returns (bool) {
+        string[] memory userActivities = userActivityTypes[_user];
+        bytes32 targetActivityHash = keccak256(bytes(_activityType));
+        for (uint i = 0; i < userActivities.length; i++) {
+            if (keccak256(bytes(userActivities[i])) == targetActivityHash) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Call addActivityType inside the function
     function startFocusSession(
         string calldata _activityType,
         uint256 _duration
     ) public {
-        uint activitiesLength = userActivityTypes[msg.sender].length;
-        if (activitiesLength == 0) {
-            revert ForestOnchain__AddAnActivityType();
-        }
         bool sessionActive = currentUserSession[msg.sender].active;
         if (sessionActive) {
             revert ForestOnchain__AnotherSessionOngoing(
@@ -57,6 +122,19 @@ contract ForestOnchain {
         }
         if (breakNeeded[msg.sender]) {
             revert ForestOnchain__BreakNeeded();
+        }
+        if (
+            _duration < MIN_SESSION_DURATION && _duration > MAX_SESSION_DURATION
+        ) {
+            revert ForestOnchain__DurationOutOfRange(_duration);
+        }
+        bool activityExists = checkActivityExists(msg.sender, _activityType);
+        if (!activityExists) {
+            addActivityType(_activityType, msg.sender);
+        }
+        UserGoal storage goal = userGoals[msg.sender][_activityType];
+        if (!goal.active) {
+            revert ForestOnchain__NoActiveGoal(_activityType);
         }
         currentUserSession[msg.sender] = UserSession({
             activityType: _activityType,
@@ -96,6 +174,8 @@ contract ForestOnchain {
 
     function endFocusSession(address _user) public {
         bool sessionActive = currentUserSession[_user].active;
+        string memory sessionActivityType = currentUserSession[_user]
+            .activityType;
         if (!sessionActive) {
             revert ForestOnchain__NoOngoingSession(_user);
         }
@@ -103,7 +183,9 @@ contract ForestOnchain {
             delete currentUserSession[_user];
             emit SessionEnded(msg.sender);
         } else {
-            numberOfTrees[_user] += 1;
+            numberOfTrees[_user][sessionActivityType] += 1;
+            UserGoal storage goal = userGoals[msg.sender][sessionActivityType];
+            goal.numberOfTrees -= 1;
             delete currentUserSession[_user];
             breakNeeded[_user] = true;
         }
@@ -124,6 +206,81 @@ contract ForestOnchain {
         emit BreakTaken(msg.sender);
     }
 
+    function changeCostPerTree(uint _costPerTree) external onlyOwner {
+        cost_per_tree = _costPerTree;
+    }
+
+    function startGoal(
+        string calldata _activityType,
+        uint _duration,
+        uint _numOfTrees
+    ) public payable {
+        bool activityExists = checkActivityExists(msg.sender, _activityType);
+        if (!activityExists) {
+            revert ForestOnchain__AddActivityType();
+        }
+        if (_duration < MAX_SESSION_DURATION) {
+            revert ForestOnchain__GoalDurationShouldBeMoreThan60Minutes(
+                _duration
+            );
+        }
+        if (_numOfTrees < MIN_NUM_TREES_PER_GOAL) {
+            revert ForestOnchain__EnterMoreThankMinNumOfTreesPerGoal(
+                _numOfTrees
+            );
+        }
+        bool goalExists = userGoals[msg.sender][_activityType].active;
+        if (goalExists) {
+            revert ForestOnchain__GoalAlreadyExists();
+        } else {
+            uint stakeAmount = getStakeAmount(_numOfTrees);
+            if (msg.value != stakeAmount) {
+                revert ForestOnchain__IncorrectStakeSent(
+                    msg.value,
+                    requiredStake
+                );
+            }
+            userGoals[msg.sender][_activityType].activityType = _activityType;
+            userGoals[msg.sender][_activityType].startTime = block.timestamp;
+            userGoals[msg.sender][_activityType].endTime =
+                block.timestamp +
+                _duration;
+            userGoals[msg.sender][_activityType].active = true;
+            userGoals[msg.sender][_activityType].numberOfTrees = _numOfTrees;
+            userGoals[msg.sender][_activityType].stakeAmount = stakeAmount;
+            emit GoalStarted(
+                msg.sender,
+                _activityType,
+                block.timestamp,
+                block.timestamp + _duration,
+                true,
+                _numOfTrees,
+                stakeAmount
+            );
+        }
+    }
+
+    function claimStake(string calldata _activityType) external {
+        UserGoal storage goal = userGoals[msg.sender][_activityType];
+        if (!goal.active) {
+            revert ForestOnchain__NoActiveGoal(_activityType);
+        }
+        if (goal.numberOfTrees != 0) {
+            revert ForestOnchain__GoalNotReached(goal.numberOfTrees);
+        }
+        if (goal.endTime < block.timestamp) {
+            revert ForestOnchain__GoalDurationIsOver(
+                goal.endTime,
+                block.timestamp
+            );
+        }
+        uint stakeAmount = goal.stakeAmount;
+        delete userGoals[msg.sender][_activityType];
+        (bool success, ) = payable(msg.sender).call{value: stakeAmount}("");
+        require(success, "ForestOnchain__TransferFailed");
+        emit GoalClaimed(msg.sender, _activityType, stakeAmount);
+    }
+
     /* Getter Functions */
     function getUserActivityTypes(
         address _user
@@ -137,8 +294,11 @@ contract ForestOnchain {
         return currentUserSession[_user];
     }
 
-    function getNumberOfTrees(address _user) external returns (uint256) {
-        return numberOfTrees[_user];
+    function getNumberOfTrees(
+        address _user,
+        string calldata _activityType
+    ) external returns (uint256) {
+        return numberOfTrees[_user][_activityType];
     }
 
     function getBreakNeeded(address _user) external returns (bool) {
@@ -147,5 +307,11 @@ contract ForestOnchain {
 
     function getUsers() external returns (address[] memory) {
         return users;
+    }
+
+    function getStakeAmount(
+        uint _numOfTrees
+    ) public returns (address[] memory) {
+        return _numOfTrees * cost_per_tree;
     }
 }
