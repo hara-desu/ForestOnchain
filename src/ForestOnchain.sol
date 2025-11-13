@@ -94,7 +94,7 @@ contract ForestOnchain {
 
     /**
      * @notice Initializes the contract with a cost per tree and sets the owner.
-     * @param  _costPerTree
+     * @param  _costPerTree The stake amount per tree in wei.
      */
     constructor(uint _costPerTree) {
         cost_per_tree = _costPerTree;
