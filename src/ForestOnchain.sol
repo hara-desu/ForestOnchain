@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT
-// TODO:
-// 1. Store hashed values of activiyTypes
 pragma solidity ^0.8.13;
 
 import {AutomationCompatibleInterface} from "@chainlink/contracts/src/v0.8/automation/AutomationCompatible.sol";
 
+/**
+ * @title  ForestOnchain
+ * @author Lada Zimina
+ * @notice A Pomodoro-style focus and goal-tracking contract with on-chain stakes.
+ */
 contract ForestOnchain {
     error ForestOnchain__AddActivityType();
     error ForestOnchain__AnotherSessionOngoing(string currentSession);
@@ -24,6 +27,23 @@ contract ForestOnchain {
     error ForestOnchain__InsufficientFunds();
     error ForestOnchain__CannotSendToZeroAddress();
     error ForestOnchain__SessionNotEndedYet(uint sessionEndTime);
+
+    struct UserSession {
+        string activityType;
+        uint256 startTime;
+        uint256 endTime;
+        bool active;
+        address owner;
+    }
+
+    struct UserGoal {
+        string activityType;
+        uint256 startTime;
+        uint256 endTime;
+        bool active;
+        uint numberOfTrees;
+        uint stakeAmount;
+    }
 
     mapping(address => string[]) internal userActivityTypes;
     mapping(address => UserSession) internal currentUserSession;
@@ -64,23 +84,6 @@ contract ForestOnchain {
     event EtherWithdrawn(address indexed to, uint indexed amount);
     event CostPerTreeChanged(uint costPerTree);
 
-    struct UserSession {
-        string activityType;
-        uint256 startTime;
-        uint256 endTime;
-        bool active;
-        address owner;
-    }
-
-    struct UserGoal {
-        string activityType;
-        uint256 startTime;
-        uint256 endTime;
-        bool active;
-        uint numberOfTrees;
-        uint stakeAmount;
-    }
-
     modifier onlyOwner() {
         require(
             msg.sender == CONTRACT_OWNER,
@@ -89,19 +92,106 @@ contract ForestOnchain {
         _;
     }
 
+    /**
+     * @notice Initializes the contract with a cost per tree and sets the owner.
+     * @param  _costPerTree
+     */
     constructor(uint _costPerTree) {
         cost_per_tree = _costPerTree;
         CONTRACT_OWNER = msg.sender;
     }
 
-    function addActivityType(
-        string calldata _activityType,
-        address _user
-    ) internal {
-        userActivityTypes[_user].push(_activityType);
-        emit ActivityAdded(_activityType);
+    receive() external payable {}
+
+    fallback() external payable {
+        revert("Function does not exist");
     }
 
+    /**
+     * @notice Called by Chainlink Automation to check if any session has ended.
+     * @dev Returns the first user with an ended active session.
+     * @return upkeepNeeded True if at least one session needs to be ended.
+     * @return performData  Encoded address of the user whose session ended.
+     */
+    function checkUpkeep(
+        bytes calldata /* checkData */
+    ) external view returns (bool upkeepNeeded, bytes memory performData) {
+        uint256 numberUsers = users.length;
+        if (numberUsers == 0) {
+            return (false, bytes(""));
+        }
+        for (uint i = 0; i < numberUsers; i++) {
+            address user = users[i];
+            UserSession memory session = currentUserSession[user];
+            if (session.active && block.timestamp >= session.endTime) {
+                return (true, abi.encode(user));
+            }
+        }
+        return (false, bytes(""));
+    }
+
+    /**
+     * @notice Called by Chainlink Automation to end a finished focus session.
+     * @param performData Encoded address of the user whose session should be ended.
+     */
+    function performUpkeep(bytes calldata performData) external {
+        address user = abi.decode(performData, (address));
+        endFocusSession(user);
+    }
+
+    /**
+     * @notice Claims the staked amount for a completed and active goal.
+     * @param _activityType The activity type of the goal to claim for.
+     */
+    function claimStake(string calldata _activityType) external {
+        UserGoal storage goal = userGoals[msg.sender][_activityType];
+        if (!goal.active) {
+            revert ForestOnchain__NoActiveGoal(_activityType);
+        }
+        if (goal.numberOfTrees != 0) {
+            revert ForestOnchain__GoalNotReached(goal.numberOfTrees);
+        }
+        if (goal.endTime < block.timestamp) {
+            revert ForestOnchain__GoalDurationIsOver(
+                goal.endTime,
+                block.timestamp
+            );
+        }
+        uint stakeAmount = goal.stakeAmount;
+        delete userGoals[msg.sender][_activityType];
+        (bool success, ) = payable(msg.sender).call{value: stakeAmount}("");
+        if (!success) {
+            revert ForestOnchain__TransferFailed();
+        }
+        emit GoalClaimed(msg.sender, _activityType, stakeAmount);
+    }
+
+    /**
+     * @notice Withdraws ETH from the contract balance to a given address.
+     * @dev Only callable by the contract owner.
+     * @param _to The recipient address of the withdrawal.
+     * @param _amount The amount of ETH to withdraw in wei.
+     */
+    function withdraw(address payable _to, uint256 _amount) external onlyOwner {
+        if (_to == payable(address(0))) {
+            revert ForestOnchain__CannotSendToZeroAddress();
+        }
+        if (_amount > address(this).balance) {
+            revert ForestOnchain__InsufficientFunds();
+        }
+        (bool success, ) = _to.call{value: _amount}("");
+        if (!success) {
+            revert ForestOnchain__TransferFailed();
+        }
+        emit EtherWithdrawn(_to, _amount);
+    }
+
+    /**
+     * @notice Checks if a user has already registered an activity type.
+     * @param _user The address of the user.
+     * @param _activityType The name of the activity type to check.
+     * @return True if the activity exists for the user, false otherwise.
+     */
     function checkActivityExists(
         address _user,
         string calldata _activityType
@@ -116,7 +206,21 @@ contract ForestOnchain {
         return false;
     }
 
-    // Call addActivityType inside the function
+    /**
+     * @notice Updates the global cost per tree used to calculate stakes.
+     * @dev Only callable by the contract owner.
+     * @param _costPerTree New cost per tree in wei.
+     */
+    function changeCostPerTree(uint _costPerTree) external onlyOwner {
+        cost_per_tree = _costPerTree;
+        emit CostPerTreeChanged(_costPerTree);
+    }
+
+    /**
+     * @notice Starts a new focus session for the caller for a given activity.
+     * @param _activityType The activity type to focus on.
+     * @param _duration The session duration in seconds.
+     */
     function startFocusSession(
         string calldata _activityType,
         uint256 _duration
@@ -159,28 +263,10 @@ contract ForestOnchain {
         );
     }
 
-    function checkUpkeep(
-        bytes calldata /* checkData */
-    ) external view returns (bool upkeepNeeded, bytes memory performData) {
-        uint256 numberUsers = users.length;
-        if (numberUsers == 0) {
-            return (false, bytes(""));
-        }
-        for (uint i = 0; i < numberUsers; i++) {
-            address user = users[i];
-            UserSession memory session = currentUserSession[user];
-            if (session.active && block.timestamp >= session.endTime) {
-                return (true, abi.encode(user));
-            }
-        }
-        return (false, bytes(""));
-    }
-
-    function performUpkeep(bytes calldata performData) external {
-        address user = abi.decode(performData, (address));
-        endFocusSession(user);
-    }
-
+    /**
+     * @notice Ends a finished focus session for a given user and updates their goal and tree count.
+     * @param _user The address of the user whose session should be ended.
+     */
     function endFocusSession(address _user) public {
         bool sessionActive = currentUserSession[_user].active;
         string memory sessionActivityType = currentUserSession[_user]
@@ -203,7 +289,7 @@ contract ForestOnchain {
     }
 
     /**
-     * @dev Function called by a user.
+     * @notice Marks the required break as taken for the caller after a session.
      */
     function takeBreak() public {
         bool sessionActive = currentUserSession[msg.sender].active;
@@ -217,11 +303,12 @@ contract ForestOnchain {
         emit BreakTaken(msg.sender);
     }
 
-    function changeCostPerTree(uint _costPerTree) external onlyOwner {
-        cost_per_tree = _costPerTree;
-        emit CostPerTreeChanged(_costPerTree);
-    }
-
+    /**
+     * @notice Starts a new goal with a stake for a given activity type.
+     * @param _activityType The activity type associated with the goal.
+     * @param _duration Total time window in seconds to complete the goal.
+     * @param _numOfTrees Number of trees (sessions) required to meet the goal.
+     */
     function startGoal(
         string calldata _activityType,
         uint _duration,
@@ -268,41 +355,18 @@ contract ForestOnchain {
         }
     }
 
-    function claimStake(string calldata _activityType) external {
-        UserGoal storage goal = userGoals[msg.sender][_activityType];
-        if (!goal.active) {
-            revert ForestOnchain__NoActiveGoal(_activityType);
-        }
-        if (goal.numberOfTrees != 0) {
-            revert ForestOnchain__GoalNotReached(goal.numberOfTrees);
-        }
-        if (goal.endTime < block.timestamp) {
-            revert ForestOnchain__GoalDurationIsOver(
-                goal.endTime,
-                block.timestamp
-            );
-        }
-        uint stakeAmount = goal.stakeAmount;
-        delete userGoals[msg.sender][_activityType];
-        (bool success, ) = payable(msg.sender).call{value: stakeAmount}("");
-        if (!success) {
-            revert ForestOnchain__TransferFailed();
-        }
-        emit GoalClaimed(msg.sender, _activityType, stakeAmount);
-    }
-
-    function withdraw(address payable _to, uint256 _amount) external onlyOwner {
-        if (_to == payable(address(0))) {
-            revert ForestOnchain__CannotSendToZeroAddress();
-        }
-        if (_amount > address(this).balance) {
-            revert ForestOnchain__InsufficientFunds();
-        }
-        (bool success, ) = _to.call{value: _amount}("");
-        if (!success) {
-            revert ForestOnchain__TransferFailed();
-        }
-        emit EtherWithdrawn(_to, _amount);
+    /**
+     * @notice Adds a new activity type for a user.
+     * @dev Internal helper used by other functions.
+     * @param _activityType The activity type name to add.
+     * @param _user The address of the user.
+     */
+    function addActivityType(
+        string calldata _activityType,
+        address _user
+    ) internal {
+        userActivityTypes[_user].push(_activityType);
+        emit ActivityAdded(_activityType);
     }
 
     /* Getter Functions */

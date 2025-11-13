@@ -21,16 +21,13 @@ To ensure fairness and automation, the contract uses **Chainlink Automation** to
   Users can create categories for different focus areas — for example, _Study_, _Work_, _Exercise_, etc.
 
 - **Timed Sessions:**  
-  Within each category, users register focus sessions ranging from **0 to 60 minutes**.
+  Within each category, users register focus sessions ranging from **20 to 60 minutes**.
 
 - **Mandatory Breaks:**  
   A short break is required after each session to maintain balance and prevent burnout.
 
 - **Progress Tracking:**  
-  The app tracks how much time each user has focused per category and per day.
-
-- **Full History:**  
-  Users can view their complete focus history — all sessions, breaks, and goals — stored immutably on-chain.
+  The app tracks how much time each user has focused per category.
 
 ---
 
@@ -73,14 +70,13 @@ After each completed session:
 
 ## 💡 Summary
 
-| Feature             | Description                                                    |
-| ------------------- | -------------------------------------------------------------- |
-| **Focus Sessions**  | On-chain Pomodoro timers with automatic completion             |
-| **Breaks**          | Enforced rest periods between focus sessions                   |
-| **Goals & Staking** | Users commit ETH and earn it back by meeting focus goals       |
-| **Tree Growth**     | Visual representation of productivity through NFTs or stats    |
-| **Automation**      | Chainlink Automation ends sessions reliably                    |
-| **Transparency**    | All data (sessions, goals, stakes) recorded immutably on-chain |
+| Feature             | Description                                                       |
+| ------------------- | ----------------------------------------------------------------- |
+| **Focus Sessions**  | On-chain Pomodoro timers with automatic completion                |
+| **Breaks**          | Enforced rest periods between focus sessions                      |
+| **Goals & Staking** | Users commit ETH and earn it back by meeting focus goals          |
+| **Tree Growth**     | Visual representation of productivity through the number of trees |
+| **Automation**      | Chainlink Automation ends sessions reliably                       |
 
 ---
 
