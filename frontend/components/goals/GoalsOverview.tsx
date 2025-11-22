@@ -1,58 +1,45 @@
 "use client";
-// This component uses React hooks and wagmi hooks, so it must run on the client.
 
 import { useState, useMemo } from "react";
-// useState: for local UI state (modal open/closed).
-// useMemo: to memorize computed values (like contract call lists, processed goals).
 
 import {
   useAccount,
   useReadContract,
   useReadContracts,
 } from "wagmi";
-// useAccount: info about the connected wallet (address).
-// useReadContract: single contract read (for activity types).
-// useReadContracts: batch/multicall (for goals + end times).
 
 import {
   FOREST_ONCHAIN_ADDRESS,
   FOREST_ONCHAIN_ABI,
 } from "@/lib/forestOnchain";
-// Shared config with your ForestOnchain contract address + ABI.
 
 import GoalForm from "./GoalForm";
-// The form component used inside the modal for creating a new goal.
 
 import ActiveGoalCard from "./ActiveGoalCard";
-// Card component that displays each active goal (and now includes Claim Stake behavior).
 
 
 // Main component that shows the user's goals and a button to create new ones.
 export default function GoalsOverview() {
-  // Get the currently connected wallet address (or undefined if not connected).
   const { address } = useAccount();
-
-  // Local state to control whether the "Create Goal" modal is open.
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // =========================================================
   // 1️⃣ Get all activity types for this user from the contract
   // =========================================================
   const {
-    data: activityTypesData,      // Raw result from getUserActivityTypes
-    refetch: refetchActivityTypes,// Function to manually trigger a refetch
-    isLoading: isLoadingActivities,// Loading flag for this read
+    data: activityTypesData,      
+    refetch: refetchActivityTypes,
+    isLoading: isLoadingActivities,
   } = useReadContract({
     address: FOREST_ONCHAIN_ADDRESS,
     abi: FOREST_ONCHAIN_ABI,
-    functionName: "getUserActivityTypes",   // function(address) -> string[]
-    args: address ? [address] : undefined,  // Only pass args if address exists
+    functionName: "getUserActivityTypes",  
+    args: address ? [address] : undefined,  
     query: {
-      enabled: Boolean(address),            // Do not run if wallet is not connected
+      enabled: Boolean(address),           
     },
   });
 
-  // Normalize activity types to a string array (default to empty array if undefined).
   const activityTypes = (activityTypesData ?? []) as string[];
 
   // =========================================================
@@ -61,12 +48,8 @@ export default function GoalsOverview() {
   //    - getEndTime(user, activityType)-> goal deadline
   // =========================================================
   const goalContracts = useMemo(() => {
-    // If no address or no activity types, we don’t need to call anything.
     if (!address || activityTypes.length === 0) return [];
 
-    // For each activity type, we create TWO contract read descriptors:
-    // [ getGoal, getEndTime ]
-    // We then flatten them into a single array.
     return activityTypes.flatMap((activityType) => [
       {
         address: FOREST_ONCHAIN_ADDRESS,
@@ -88,18 +71,15 @@ export default function GoalsOverview() {
       },
     ]);
   }, [address, activityTypes]);
-  // Memoized to avoid rebuilding this array on every render unless
-  // "address" or "activityTypes" changes.
 
-  // Actually perform the multicall reads for all goals/endTimes.
   const {
-    data: goalsData,          // Array of { result, status, ... } for each call
-    refetch: refetchGoals,    // Function to refetch this multicall
-    isLoading: isLoadingGoals,// Loading flag for this batch read
+    data: goalsData,          
+    refetch: refetchGoals,    
+    isLoading: isLoadingGoals,
   } = useReadContracts({
-    contracts: goalContracts, // The array we just built
+    contracts: goalContracts,
     query: {
-      enabled: goalContracts.length > 0, // Only run if there is something to read
+      enabled: goalContracts.length > 0, 
     },
   });
 
@@ -109,10 +89,8 @@ export default function GoalsOverview() {
   //    { activityType, treesRemaining, endTime, stakedAmount }
   // =========================================================
   const activeGoals = useMemo(() => {
-    // If no data or no activity types, return an empty list.
     if (!goalsData || activityTypes.length === 0) return [];
 
-    // We'll accumulate results into this array.
     const results: {
       activityType: string;
       treesRemaining: bigint;
@@ -152,9 +130,7 @@ export default function GoalsOverview() {
 
     return results;
   }, [goalsData, activityTypes]);
-  // Again, memoized so we only recompute when goalsData or activityTypes change.
 
-  // Combined loading flag from both activity-type and goals calls.
   const isLoading = isLoadingActivities || isLoadingGoals;
 
   // =========================================================
@@ -169,8 +145,6 @@ export default function GoalsOverview() {
     refetchGoals();
   }
 
-  // If there's no wallet connected, show a simple message and
-  // do not attempt to query goals.
   if (!address) {
     return (
       <div className="space-y-4">
@@ -180,16 +154,8 @@ export default function GoalsOverview() {
     );
   }
 
-  // =========================================================
-  // If we DO have a connected wallet, render the goals UI:
-  //  - Page title + "Create Goal" button
-  //  - Loading / empty states
-  //  - List of ActiveGoalCard components
-  //  - Modal with GoalForm
-  // =========================================================
   return (
     <div className="space-y-4">
-      {/* Header: title + Create Goal button (opens modal) */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Your Goals</h1>
         <button
@@ -217,8 +183,8 @@ export default function GoalsOverview() {
       <div className="grid gap-4">
         {activeGoals.map((goal) => (
           <ActiveGoalCard
-            key={goal.activityType}           // React key for list rendering
-            activityType={goal.activityType} // Passed into the card as props
+            key={goal.activityType}           
+            activityType={goal.activityType} 
             treesRemaining={goal.treesRemaining}
             endTime={goal.endTime}
             stakedAmount={goal.stakedAmount}
@@ -226,13 +192,12 @@ export default function GoalsOverview() {
         ))}
       </div>
 
-      {/* Very simple modal implementation: semi-transparent overlay + centered box */}
       {isModalOpen && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
             <GoalForm
-              onSuccess={handleGoalCreated}          // Close + refresh on success
-              onCancel={() => setIsModalOpen(false)} // Close when Cancel is clicked
+              onSuccess={handleGoalCreated}          
+              onCancel={() => setIsModalOpen(false)} 
             />
           </div>
         </div>

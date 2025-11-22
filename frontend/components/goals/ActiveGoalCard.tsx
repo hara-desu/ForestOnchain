@@ -32,10 +32,8 @@ export default function ActiveGoalCard({
   const nowSeconds = BigInt(Math.floor(Date.now() / 1000));
   const isExpired = endTime > 0n && endTime < nowSeconds;
 
-  // Track local error state for claim button UI.
   const [claimError, setClaimError] = useState<string | null>(null);
 
-  // Set up write hook for calling claimStake.
   const {
     writeContract,
     data: txHash,
@@ -43,7 +41,6 @@ export default function ActiveGoalCard({
     error: txError,
   } = useWriteContract();
 
-  // Track confirmation status of the claim transaction.
   const {
     isLoading: isConfirming,
     isSuccess: isClaimConfirmed,
@@ -52,10 +49,8 @@ export default function ActiveGoalCard({
     query: { enabled: Boolean(txHash) },
   });
 
-  // Combined loading state while claim tx is in-flight.
   const isClaiming = isClaimPending || isConfirming;
 
-  // Only allow claiming if goal is not expired and all trees are completed.
   const canClaim = !isExpired && treesRemaining === 0n;
 
   // Handler to call claimStake(activityType) on the contract.

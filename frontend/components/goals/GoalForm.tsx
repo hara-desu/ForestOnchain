@@ -1,9 +1,6 @@
 "use client";
-// This component uses React hooks and wallet state, so it must run on the client.
 
 import { useState, FormEvent, useEffect } from "react";
-// useState: local component state (inputs, flags, errors).
-// FormEvent: type for the form submit event.
 
 import {
   useAccount,
@@ -11,24 +8,16 @@ import {
   useWriteContract,
   useWaitForTransactionReceipt,
 } from "wagmi";
-// useAccount: info about the connected wallet (address, isConnected).
-// useReadContract: read-only calls to your contract.
-// useWriteContract: for sending transactions to your contract.
-// useWaitForTransactionReceipt: to track transaction confirmation.
 
 import { formatEther } from "viem";
-// formatEther: converts wei (bigint) into ETH as a readable string/number.
 
 import {
   FOREST_ONCHAIN_ADDRESS,
   FOREST_ONCHAIN_ABI,
 } from "@/lib/forestOnchain";
-// Your contract address + ABI, imported from a shared helper.
 
 type GoalFormProps = {
-  // Optional callback when goal creation succeeds (used to close modal, refresh data).
   onSuccess?: () => void;
-  // Optional callback when user clicks Cancel.
   onCancel?: () => void;
 };
 
@@ -36,12 +25,10 @@ type GoalFormProps = {
 function getFriendlyErrorMessage(error: unknown): string {
   if (!error) return "Transaction failed for an unknown reason.";
 
-  // wagmi / viem error objects often have 'shortMessage' and 'details'
   if (typeof error === "object" && "shortMessage" in error) {
     const e = error as { shortMessage?: string; message?: string; details?: string };
     const details = e.details ?? "";
 
-    // Try to detect your custom errors by name and show a clearer message
     if (details.includes("GoalAlreadyExists")) {
       return "You already have an active goal with this activity type.";
     }
@@ -52,7 +39,6 @@ function getFriendlyErrorMessage(error: unknown): string {
       return "Goal duration must be at least 60 minutes total.";
     }
 
-    // Fallback to shortMessage or message
     return e.shortMessage || e.message || "Transaction failed.";
   }
 
@@ -64,15 +50,12 @@ function getFriendlyErrorMessage(error: unknown): string {
 }
 
 export default function GoalForm({ onSuccess, onCancel }: GoalFormProps) {
-  // Current connected wallet address (or undefined if not connected).
   const { address } = useAccount();
 
-  // Local form state: activity type, goal duration in DAYS, and number of trees.
   const [activityType, setActivityType] = useState("Study");
   const [durationDays, setDurationDays] = useState("1"); // default: 1 day
   const [numTrees, setNumTrees] = useState("1");
 
-  // Flags and errors for UX.
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -80,72 +63,64 @@ export default function GoalForm({ onSuccess, onCancel }: GoalFormProps) {
   // 1) Read cost_per_tree (global config)
   // ---------------------------
   const { data: costPerTreeData } = useReadContract({
-    address: FOREST_ONCHAIN_ADDRESS,        // Contract address
-    abi: FOREST_ONCHAIN_ABI,                // Contract ABI
-    functionName: "cost_per_tree",          // Public uint in your contract
+    address: FOREST_ONCHAIN_ADDRESS,        
+    abi: FOREST_ONCHAIN_ABI,                
+    functionName: "cost_per_tree",          
     query: {
-      enabled: Boolean(address),            // Only run if wallet is connected
+      enabled: Boolean(address),            
     },
   });
 
-  // Normalize the read value into a bigint, defaulting to 0n if undefined.
   const costPerTree = (costPerTreeData ?? 0n) as bigint;
 
   // ---------------------------
   // 2) Set up write + tx tracking
   // ---------------------------
   const {
-    writeContract,         // Function to actually send transactions.
-    data: txHash,          // Hash of the submitted transaction, once sent.
-    isPending: isTxPending,// True while the transaction is being sent.
-    error: txError,        // Any client-side or RPC error from write.
+    writeContract,         
+    data: txHash,          
+    isPending: isTxPending,
+    error: txError,        
   } = useWriteContract();
 
   const {
-    isLoading: isConfirming,  // True while waiting for the tx to be mined.
-    isSuccess: isConfirmed,   // True once the transaction is confirmed.
+    isLoading: isConfirming,  
+    isSuccess: isConfirmed,   
   } = useWaitForTransactionReceipt({
-    hash: txHash,             // Track this hash.
-    query: { enabled: Boolean(txHash) }, // Only run if we actually have a tx hash.
+    hash: txHash,             
+    query: { enabled: Boolean(txHash) }, 
   });
 
   // ---------------------------
   // 3) Compute stake (ETH amount)
   // ---------------------------
 
-  // Convert numTrees from string → number for some checks.
   const numTreesInt = Number(numTrees || "0");
 
-  // totalStakeWei = cost_per_tree * numTrees
   const totalStakeWei =
     numTreesInt > 0 ? costPerTree * BigInt(numTreesInt) : 0n;
 
-  // Convert wei → ETH number for display.
   const totalStakeEth = Number(formatEther(totalStakeWei || 0n));
 
-  // Combined flag: any submitting/confirming state.
   const isSubmitting = isTxPending || isConfirming;
 
   // ---------------------------
   // 4) Form submit handler
   // ---------------------------
   async function handleSubmit(e: FormEvent) {
-    e.preventDefault();      // Prevent default <form> page reload behavior.
-    setFormError(null);     // Clear any previous error.
+    e.preventDefault();      
+    setFormError(null);     
 
-    // Must have a connected wallet.
     if (!address) {
       setFormError("Please connect your wallet first.");
       return;
     }
 
-    // Activity type is required.
     if (!activityType.trim()) {
       setFormError("Activity type is required.");
       return;
     }
 
-    // Enforce the 32-character limit (to mirror bytes32-ish length).
     if (activityType.length > 32) {
       setFormError("Activity type must be 32 characters or fewer.");
       return;
@@ -164,41 +139,35 @@ export default function GoalForm({ onSuccess, onCancel }: GoalFormProps) {
       return;
     }
 
-    // Make sure we have a valid cost_per_tree from contract.
     if (costPerTree === 0n) {
       setFormError("Cost per tree cannot be 0.");
       return;
     }
 
-    // Flip this so that when the tx confirms we can trigger onSuccess.
     setHasSubmitted(true);
 
     try {
       // ---------------------------
       // Convert days → seconds
       // ---------------------------
-      // Your contract expects duration in SECONDS.
-      // 1 day = 24 hours * 60 minutes * 60 seconds = 86400 seconds.
       const durationSeconds = BigInt(duration) * 24n * 60n * 60n;
 
-      // Call startGoal(activityType, durationSeconds, numTrees) with stake as msg.value.
       await writeContract({
         address: FOREST_ONCHAIN_ADDRESS,
         abi: FOREST_ONCHAIN_ABI,
         functionName: "startGoal",
         args: [activityType, durationSeconds, BigInt(numTreesInt)],
-        value: totalStakeWei,    // ETH value sent with the transaction (stake)
+        value: totalStakeWei,    
       });
     } catch (err) {
       console.error(err);
       setFormError(getFriendlyErrorMessage(err));
-      setHasSubmitted(false);   // Allow resubmission if something went wrong.
+      setHasSubmitted(false);   
     }
   }
 
   // ---------------------------
   // 5) When tx is confirmed, call onSuccess (to close modal + refresh)
-  //    ⚠️ This must be done in useEffect, not directly in render.
   // ---------------------------
   useEffect(() => {
     if (isConfirmed && hasSubmitted && onSuccess) {
@@ -216,10 +185,8 @@ export default function GoalForm({ onSuccess, onCancel }: GoalFormProps) {
   // ---------------------------
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Title */}
       <h2 className="text-xl font-semibold mb-2">Create a new goal</h2>
 
-      {/* Activity type input */}
       <div className="space-y-1">
         <label className="block text-sm font-medium">
           Activity Type (max 32 characters)
@@ -285,14 +252,12 @@ export default function GoalForm({ onSuccess, onCancel }: GoalFormProps) {
         </p>
       </div>
 
-      {/* Form-level error (validation or tx error we set manually) */}
       {formError && (
         <p className="text-sm text-red-600">
           {formError}
         </p>
       )}
 
-      {/* Backup error from txError if we didn't already set formError */}
       {derivedTxError && (
         <p className="text-sm text-red-600">
           {derivedTxError}
