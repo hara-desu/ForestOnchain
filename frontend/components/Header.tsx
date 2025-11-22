@@ -21,14 +21,19 @@ export default function Header() {
         {/* Left side: logo + app title    */}
         {/* ------------------------------ */}
         {/* Clicking this takes you back to the home page "/" */}
-        <Link href="/" className="flex items-center gap-2 text-xl font-semibold">
-          
-          {/* Seed emoji logo */}
-          <span className="text-2xl">🌱</span>
+        <div className="flex items-center gap-6">
+          <Link href="/" className="flex items-center gap-2 text-xl font-semibold">
+            
+            {/* Seed emoji logo */}
+            <span className="text-2xl">🌱</span>
 
-          {/* Name of the app */}
-          <span>Forest Onchain</span>
-        </Link>
+            {/* Name of the app */}
+            <span>Forest Onchain</span>
+          </Link>
+          <Link href="/goals" className="text-sm text-gray-700 hover:text-black">
+              Goals
+          </Link>
+        </div>
 
         {/* ------------------------------ */}
         {/* Right side: Wallet Connect UI */}

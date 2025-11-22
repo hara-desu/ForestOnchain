@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Deployed at: 0xA70C21d6577de79270BcA81065Ca42D7BE0CeF2d
+// Deployed at: 0x732b3f7eff51a10A515BC2e2666f9b334B1e78E9
 pragma solidity ^0.8.13;
 
 import {AutomationCompatibleInterface} from "@chainlink/contracts/src/v0.8/automation/AutomationCompatible.sol";
@@ -325,6 +325,10 @@ contract ForestOnchain {
                 _numOfTrees
             );
         }
+        bool activityExists = checkActivityExists(msg.sender, _activityType);
+        if (!activityExists) {
+            addActivityType(_activityType, msg.sender);
+        }
         bool goalExists = userGoals[msg.sender][_activityType].active;
         if (goalExists) {
             revert ForestOnchain__GoalAlreadyExists();
@@ -414,5 +418,12 @@ contract ForestOnchain {
         string calldata _activityType
     ) public returns (uint) {
         return userGoals[_user][_activityType].endTime;
+    }
+
+    function getStakedAmount(
+        address _user,
+        string calldata _activityType
+    ) public returns (uint) {
+        return userGoals[_user][_activityType].stakeAmount;
     }
 }

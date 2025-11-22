@@ -11,7 +11,7 @@ test-specific:
 	forge test --mt $(TEST) -vvvv
 
 deploy-sepolia:
-	forge script script/DeployForestOnchain.s.sol:DeployForestOnchainSepolia \
+	forge script script/DeployForestOnchain.s.sol:DeployForestOchainSepolia \
 		--rpc-url $(SEPOLIA_RPC_URL) \
 		--broadcast \
 		--verify \

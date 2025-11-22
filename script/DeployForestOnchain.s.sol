@@ -18,7 +18,7 @@ contract DeployForestOnchainLocal is Script {
 }
 
 contract DeployForestOchainSepolia is Script {
-    uint public constant COST_PER_TREE = 1e9;
+    uint public constant COST_PER_TREE = 0.2 ether;
 
     function run() external {
         require(
