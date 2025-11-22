@@ -57,6 +57,7 @@ contract ForestOnchain {
     uint constant MAX_SESSION_DURATION = 60 minutes;
     uint constant MIN_SESSION_DURATION = 20 minutes;
     uint constant MIN_NUM_TREES_PER_GOAL = 1;
+    uint256 public totalStaked;
 
     event ActivityAdded(string indexed activityType);
     event SessionStarted(
@@ -160,6 +161,7 @@ contract ForestOnchain {
         }
         uint stakeAmount = goal.stakeAmount;
         delete userGoals[msg.sender][_activityType];
+        totalStaked -= stakeAmount;
         (bool success, ) = payable(msg.sender).call{value: stakeAmount}("");
         if (!success) {
             revert ForestOnchain__TransferFailed();
@@ -178,6 +180,10 @@ contract ForestOnchain {
             revert ForestOnchain__CannotSendToZeroAddress();
         }
         if (_amount > address(this).balance) {
+            revert ForestOnchain__InsufficientFunds();
+        }
+        uint256 available = address(this).balance - totalStaked;
+        if (_amount > available) {
             revert ForestOnchain__InsufficientFunds();
         }
         (bool success, ) = _to.call{value: _amount}("");
@@ -340,6 +346,7 @@ contract ForestOnchain {
                     stakeAmount
                 );
             }
+            totalStaked += stakeAmount;
             userGoals[msg.sender][_activityType].activityType = _activityType;
             userGoals[msg.sender][_activityType].startTime = block.timestamp;
             userGoals[msg.sender][_activityType].endTime =
