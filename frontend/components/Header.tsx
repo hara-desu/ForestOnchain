@@ -21,6 +21,9 @@ export default function Header() {
           <Link href="/goals" className="text-sm text-gray-700 hover:text-black">
               Goals
           </Link>
+            <Link href="/session" className="text-sm text-gray-700 hover:underline">
+              Session
+            </Link>
           <Link href="/admin" className="text-sm text-gray-700 hover:underline">
             Admin
           </Link>
