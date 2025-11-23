@@ -30,7 +30,7 @@ export default function Footer() {
             href="mailto:hzhz10702@gmail.com"
             className="text-emerald-600 hover:underline"
           >
-            hzhz10702@gmail.com
+            hzhz1070@gmail.com
           </a>
         </p>
 
