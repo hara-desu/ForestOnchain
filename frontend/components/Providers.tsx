@@ -41,7 +41,7 @@ const config = getDefaultConfig({
   projectId: process.env.NEXT_PUBLIC_WC_PROJECT_ID!, 
   // WalletConnect Project ID (required).
 
-  chains: [mainnet, sepolia, anvil],
+  chains: [sepolia],
 
   ssr: true,
   // Enables server-side rendering compatibility.
