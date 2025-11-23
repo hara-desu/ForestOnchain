@@ -221,7 +221,7 @@ export default function SessionControls({
               type="submit"
               className="px-4 py-1.5 text-sm rounded-md border"
             >
-              Start Break Timer
+              Start Break
             </button>
 
             <button
@@ -230,7 +230,7 @@ export default function SessionControls({
               disabled={isSubmitting || !breakNeeded}
               className="px-4 py-1.5 text-sm rounded-md bg-emerald-600 text-white disabled:opacity-60"
             >
-              Mark Break Taken (on-chain)
+              End break
             </button>
           </div>
         </form>
