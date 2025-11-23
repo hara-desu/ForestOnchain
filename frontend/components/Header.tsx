@@ -18,7 +18,7 @@ export default function Header() {
             <span className="text-2xl">🌱</span>
             <span>Forest Onchain</span>
           </Link>
-          <Link href="/goals" className="text-sm text-gray-700 hover:text-black">
+          <Link href="/goals" className="text-sm text-gray-700 hover:underline">
               Goals
           </Link>
             <Link href="/session" className="text-sm text-gray-700 hover:underline">

@@ -117,15 +117,15 @@ export default function GoalsOverview() {
       const stakedAmount =
         (stakedAmountResult?.result as bigint | undefined) ?? 0n;
 
-      // Simple rule for "active": there are still trees left to complete.
-      if (treesRemaining > 0n) {
+      if (endTime > 0n) {
         results.push({
           activityType: activityTypes[i],
           treesRemaining,
           endTime,
-          stakedAmount
+          stakedAmount,
         });
       }
+        
     }
 
     return results;
