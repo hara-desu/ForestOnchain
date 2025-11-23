@@ -137,115 +137,112 @@ export default function SessionControls({
   }
 
   return (
-    <div className="border rounded-lg p-4 bg-white shadow-sm space-y-4">
-      <h2 className="font-semibold text-lg">
-        Session & Break Controls
-      </h2>
+    <div className="grid gap-4 md:grid-cols-2">
+      {/* LEFT: session controls */}
+      <div className="border rounded-lg p-4 bg-white shadow-sm space-y-4">
+        <h2 className="font-semibold text-lg">Session Controls</h2>
 
-      {/* Choose activity / goal */}
-      <form
-        onSubmit={handleStartSession}
-        className="space-y-3"
-      >
-        <div className="space-y-1">
-          <label className="block text-sm font-medium">
-            Choose goal / activity
-          </label>
-          <select
-            value={selectedActivity}
-            onChange={(e) => setSelectedActivity(e.target.value)}
-            className="w-full border rounded-md px-3 py-2 text-sm"
+        {/* Choose activity / goal */}
+        <form onSubmit={handleStartSession} className="space-y-3">
+          <div className="space-y-1">
+            <label className="block text-sm font-medium">
+              Choose goal / activity
+            </label>
+            <select
+              value={selectedActivity}
+              onChange={(e) => setSelectedActivity(e.target.value)}
+              className="w-full border rounded-md px-3 py-2 text-sm"
+            >
+              {activeGoals.map((goal) => (
+                <option
+                  key={goal.activityType}
+                  value={goal.activityType}
+                >
+                  {goal.activityType} ({goal.treesRemaining.toString()}{" "}
+                  trees left)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Session length input */}
+          <div className="space-y-1">
+            <label className="block text-sm font-medium">
+              Session length (minutes)
+            </label>
+            <input
+              type="number"
+              min={20}
+              max={60}
+              value={sessionMinutes}
+              onChange={(e) => setSessionMinutes(e.target.value)}
+              className="w-full border rounded-md px-3 py-2 text-sm"
+            />
+            <p className="text-xs text-gray-500">
+              Contract enforces 20–60 minutes.
+            </p>
+          </div>
+
+          <button
+            type="submit"
+            disabled={isSubmitting || activeGoals.length === 0}
+            className="px-4 py-1.5 text-sm rounded-md bg-emerald-600 text-white disabled:opacity-60"
           >
-            {activeGoals.map((goal) => (
-              <option
-                key={goal.activityType}
-                value={goal.activityType}
-              >
-                {goal.activityType} ({goal.treesRemaining.toString()}{" "}
-                trees left)
-              </option>
-            ))}
-          </select>
-        </div>
+            {isSubmitting ? "Starting..." : "Start Session"}
+          </button>
+        </form>
+      </div>
 
-        {/* Session length input */}
-        <div className="space-y-1">
-          <label className="block text-sm font-medium">
-            Session length (minutes)
-          </label>
-          <input
-            type="number"
-            min={20}
-            max={60}
-            value={sessionMinutes}
-            onChange={(e) => setSessionMinutes(e.target.value)}
-            className="w-full border rounded-md px-3 py-2 text-sm"
-          />
-          <p className="text-xs text-gray-500">
-            Contract enforces 20–60 minutes.
-          </p>
-        </div>
-
-        <button
-          type="submit"
-          disabled={isSubmitting || activeGoals.length === 0}
-          className="px-4 py-1.5 text-sm rounded-md bg-emerald-600 text-white disabled:opacity-60"
-        >
-          {isSubmitting ? "Starting..." : "Start Session"}
-        </button>
-      </form>
-
-      {/* Break controls */}
-      <form
-        onSubmit={handleScheduleBreak}
-        className="space-y-3 border-t pt-3"
-      >
+      {/* RIGHT: break controls */}
+      <div className="border rounded-lg p-4 bg-white shadow-sm space-y-4">
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium">
-            Break controls
-          </span>
+          <h2 className="font-semibold text-lg">Break Controls</h2>
           <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700">
             {breakNeeded ? "Break required" : "No break required"}
           </span>
         </div>
 
-        <div className="space-y-1">
-          <label className="block text-sm font-medium">
-            Break length (minutes)
-          </label>
-          <input
-            type="number"
-            min={1}
-            value={breakMinutes}
-            onChange={(e) => setBreakMinutes(e.target.value)}
-            className="w-full border rounded-md px-3 py-2 text-sm"
-          />
-        </div>
+        <form onSubmit={handleScheduleBreak} className="space-y-3">
+          <div className="space-y-1">
+            <label className="block text-sm font-medium">
+              Break length (minutes)
+            </label>
+            <input
+              type="number"
+              min={1}
+              value={breakMinutes}
+              onChange={(e) => setBreakMinutes(e.target.value)}
+              className="w-full border rounded-md px-3 py-2 text-sm"
+            />
+          </div>
 
-        <div className="flex gap-2">
-          <button
-            type="submit"
-            className="px-4 py-1.5 text-sm rounded-md border"
-          >
-            Start Break Timer
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              className="px-4 py-1.5 text-sm rounded-md border"
+            >
+              Start Break Timer
+            </button>
 
-          <button
-            type="button"
-            onClick={handleTakeBreakOnChain}
-            disabled={isSubmitting || !breakNeeded}
-            className="px-4 py-1.5 text-sm rounded-md bg-emerald-600 text-white disabled:opacity-60"
-          >
-            Mark Break Taken (on-chain)
-          </button>
-        </div>
-      </form>
+            <button
+              type="button"
+              onClick={handleTakeBreakOnChain}
+              disabled={isSubmitting || !breakNeeded}
+              className="px-4 py-1.5 text-sm rounded-md bg-emerald-600 text-white disabled:opacity-60"
+            >
+              Mark Break Taken (on-chain)
+            </button>
+          </div>
+        </form>
+      </div>
 
+      {/* Shared error message at the bottom of the grid */}
       {(formError || txError) && (
-        <p className="text-sm text-red-600">
+        <p className="text-sm text-red-600 md:col-span-2">
           {formError ?? txError?.message}
         </p>
       )}
     </div>
   );
+
 }
