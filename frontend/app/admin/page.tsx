@@ -66,16 +66,6 @@ export default function AdminPage() {
 
       <div className="text-sm space-y-1">
         <p>
-          Connected as:{" "}
-          <span className="font-mono">{address}</span>
-        </p>
-        {ownerAddress && (
-          <p>
-            Contract owner:{" "}
-            <span className="font-mono">{ownerAddress}</span>
-          </p>
-        )}
-        <p>
           Current cost per tree:{" "}
           <span className="font-mono">
             {formatEther(costPerTree)} ETH

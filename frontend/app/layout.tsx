@@ -1,10 +1,9 @@
 import "./globals.css";
 
 import type { Metadata } from "next";
-
 import { Providers } from "../components/Providers";
-
 import Header from "../components/Header";
+import Footer from "@/components/Footer";
 
 export const metadata: Metadata = {
   title: "Forest Onchain",
@@ -20,15 +19,15 @@ export default function RootLayout({
     // Root HTML wrapper
     <html lang="en">
 
-      <body>
+      <body className="min-h-screen flex flex-col">
         <Providers>
           <Header />
 
           {/* Main page content area */}
-          <main className="sm:max-w-xl md:max-w-3xl mx-auto p-3">
+          <main className="flex-1 max-w-4xl mx-auto p-6">
             {children}
           </main>
-
+          <Footer />
         </Providers>
       </body>
     </html>
